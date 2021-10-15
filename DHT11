@@ -1,0 +1,95 @@
+#include <LiquidCrystal.h>
+#include "DHT.h"
+#include <SoftwareSerial.h>    
+#include <Wire.h>
+
+LiquidCrystal lcd(12, 9, 5, 4, 3, 7);
+#define DHTPIN 2     
+String agAdi = "ekargemuhendislik";                       
+String agSifresi = "ekarge2013";  
+
+int rxPin = 2;            
+int txPin = 3;    
+
+String ip = "10.0.0.63";
+
+#define DEBUG true
+SoftwareSerial esp(rxPin, txPin);
+
+#define DHTTYPE DHT11   // DHT 11
+DHT dht(DHTPIN, DHTTYPE);
+
+void setup() {
+  lcd.begin(16, 2);
+  Serial.begin(9600);
+  esp.begin(9600);
+  esp.println("AT"); 
+  Serial.println("AT Yollandı");  
+   while(!esp.find("OK")){ 
+    esp.println("AT");
+    Serial.println("ESP8266 ile iletisim kurulamadı.");
+  }
+  Serial.println("OK Komutu Alındı");
+  esp.println("AT+CWMODE=1"); 
+
+   while(!esp.find("OK")){ 
+    esp.println("AT+CWMODE=1");
+    Serial.println("Modül Ayarı Yapılıyor....");
+  }
+  Serial.println("Client olarak ayarlandı");
+  Serial.println("Ağa Bağlanılıyor...");
+esp.println("AT+CWJAP=\""+agAdi+"\",\""+agSifresi+"\"");  
+
+  while(!esp.find("OK"));    
+  Serial.println("Ağa Bağlanıldı.");
+  delay(1000);
+  
+  dht.begin();
+}
+
+void loop() {
+
+  esp.println("AT+CIPSTART=\"TCP\",\""+ip+"\",80");
+  if(esp.find("Error")){                                      //Bağlantı hatası kontrolü yapıyoruz.
+    Serial.println("AT+CIPSTART Error");
+  }
+  
+  float h = dht.readHumidity();
+  float t = dht.readTemperature();
+  float f = dht.readTemperature(true);
+
+  if (isnan(h) || isnan(t) || isnan(f)) {
+    lcd.println(F("Sensor okunamadi..!"));
+    return;
+  }
+  String veri = "";   
+  veri += "&field1=";
+  veri += String(t);
+  veri += "&field2=";
+  veri += String(h);
+  veri += "\r\n\r\n";
+  esp.print("AT+CIPSEND=");                                   //ESP'ye göndereceğimiz veri uzunluğunu veriyoruz.
+  esp.println(veri.length()+2);
+  delay(2000);
+
+  if(esp.find(">")){                                          //ESP8266 hazır olduğunda içindeki komutlar çalışıyor.
+    esp.print(veri);                                          //Veriyi gönderiyoruz.
+    Serial.println(veri);
+    Serial.println("Veri gonderildi.");
+    delay(1000);
+  }
+  Serial.println("Baglantı Kapatildi.");
+  esp.println("AT+CIPCLOSE");                                //Bağlantıyı kapatıyoruz
+  delay(1000);  
+  
+  
+lcd.setCursor(0,0);
+lcd.print("Seni Seviyorum");
+//lcd.print(h);
+//lcd.setCursor(0,1);
+//lcd.print("Temp: ");
+//lcd.print(t);
+delay(300);
+}
+                                                  //dönen cevabı yazdır.
+    
